@@ -1,13 +1,13 @@
 {
-  "statusLine": {
-    "type": "command",
-    "command": "/home/door/.local/bin/cc-statusline.sh",
-    "padding": 0
-  },
   "permissions": {
     "defaultMode": "bypassPermissions"
   },
-  "effortLevel": "high",
+  "statusLine": {
+    "type": "command",
+    "command": "$HOME/.local/bin/cc-statusline.sh",
+    "padding": 0
+  },
+  "effortLevel": "xhigh",
   "voice": {
     "enabled": true,
     "mode": "hold"
@@ -16,6 +16,5 @@
   "theme": "dark",
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
-  "voiceEnabled": true,
-  "model": "sonnet"
+  "voiceEnabled": true
 }
