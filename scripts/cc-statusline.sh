@@ -7,11 +7,13 @@ input=$(cat)
 # '|' como delimitador (no-whitespace) para preservar campos vacíos.
 # Con IFS=$'\t' + @tsv, bash colapsaba tabs consecutivos cuando
 # context_window.used_percentage es null, desplazando todos los campos.
-IFS='|' read -r cwd model effort ctx rl rl_resets <<<"$(
+IFS='|' read -r cwd model effort ctx_tok ctx_size ctx_pct rl rl_resets <<<"$(
     echo "$input" | jq -r '[
         .workspace.current_dir // .cwd // "",
         .model.display_name // "",
         .effort.level // "",
+        .context_window.total_input_tokens,
+        .context_window.context_window_size,
         .context_window.used_percentage,
         .rate_limits.five_hour.used_percentage,
         .rate_limits.five_hour.resets_at
@@ -225,15 +227,16 @@ if [ -n "$effort" ]; then
 fi
 
 ctx_label=""; ctx_short=""; ctx_color="$C_OK"
-if [ -n "$ctx" ]; then
-    ctx_int=${ctx%.*}
-    # Umbrales para Opus 4.7 1M: 13%=130K (mid-context blindness, MRCR -30pts),
-    # 25%=250K (zona donde el rendimiento de 4.7 cae por debajo del 50%).
-    if   [ "$ctx_int" -ge 25 ]; then ctx_color="$C_CRIT"
-    elif [ "$ctx_int" -ge 13 ]; then ctx_color="$C_WARN"
+if [ -n "$ctx_tok" ] && [ -n "$ctx_size" ]; then
+    ctx_tk=$(( (${ctx_tok%.*} + 500) / 1000 ))
+    ctx_sk=$(( ${ctx_size%.*} / 1000 ))
+    ctx_pct_int=${ctx_pct%.*}
+    # Umbrales: 13%≈26K (mid-context blindness), 25%≈50K (rendimiento cae).
+    if   [[ "$ctx_pct_int" =~ ^[0-9]+$ ]] && [ "$ctx_pct_int" -ge 25 ]; then ctx_color="$C_CRIT"
+    elif [[ "$ctx_pct_int" =~ ^[0-9]+$ ]] && [ "$ctx_pct_int" -ge 13 ]; then ctx_color="$C_WARN"
     fi
-    ctx_label="ctx:${ctx_int}%"
-    ctx_short="c:${ctx_int}%"
+    ctx_short="c:${ctx_tk}K/${ctx_sk}K"
+    ctx_label="$ctx_short"
 fi
 
 rl_label=""; rl_short=""; rl_color="$C_MODEL"
