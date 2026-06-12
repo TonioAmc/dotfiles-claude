@@ -235,7 +235,7 @@ if [ -n "$ctx_tok" ] && [ -n "$ctx_size" ]; then
     if   [[ "$ctx_pct_int" =~ ^[0-9]+$ ]] && [ "$ctx_pct_int" -ge 25 ]; then ctx_color="$C_CRIT"
     elif [[ "$ctx_pct_int" =~ ^[0-9]+$ ]] && [ "$ctx_pct_int" -ge 13 ]; then ctx_color="$C_WARN"
     fi
-    ctx_short="c:${ctx_tk}K/${ctx_sk}K"
+    ctx_short="c:${ctx_tk}K"
     ctx_label="$ctx_short"
 fi
 
