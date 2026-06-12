@@ -4,16 +4,18 @@
 
 input=$(cat)
 
-# Una sola llamada a jq — extrae todos los campos en tab-separated values
-IFS=$'\t' read -r cwd model effort ctx rl rl_resets <<<"$(
+# '|' como delimitador (no-whitespace) para preservar campos vacíos.
+# Con IFS=$'\t' + @tsv, bash colapsaba tabs consecutivos cuando
+# context_window.used_percentage es null, desplazando todos los campos.
+IFS='|' read -r cwd model effort ctx rl rl_resets <<<"$(
     echo "$input" | jq -r '[
         .workspace.current_dir // .cwd // "",
         .model.display_name // "",
         .effort.level // "",
-        .context_window.used_percentage // "",
-        .rate_limits.five_hour.used_percentage // "",
-        .rate_limits.five_hour.resets_at // ""
-    ] | @tsv'
+        .context_window.used_percentage,
+        .rate_limits.five_hour.used_percentage,
+        .rate_limits.five_hour.resets_at
+    ] | join("|")'
 )"
 
 # Path corto: ~ si es home, basename si está dentro de un proyecto.
@@ -118,6 +120,26 @@ C_HAIKU=$'\e[38;5;114m'    # verde
 C_SERVER=$'\e[38;5;80m'    # cyan para la URL del dev server
 RESET=$'\e[0m'
 
+# Gradiente iridiscente: cada carácter del nombre recibe un color del espectro
+fable_rainbow() {
+    local text="$1"
+    local colors=(
+        $'\e[1;38;5;201m'
+        $'\e[1;38;5;135m'
+        $'\e[1;38;5;75m'
+        $'\e[1;38;5;51m'
+        $'\e[1;38;5;87m'
+        $'\e[1;38;5;154m'
+        $'\e[1;38;5;220m'
+    )
+    local len=${#text} result=""
+    for (( i=0; i<len; i++ )); do
+        result+="${colors[$((i % ${#colors[@]}))]}"
+        result+="${text:$i:1}"
+    done
+    printf '%s%s' "$result" "$RESET"
+}
+
 parts=()
 if [ -n "$branch" ]; then
     if [[ "$branch" == *"*" ]]; then
@@ -137,12 +159,12 @@ fi
 if [ -n "$model" ]; then
     model_lower=$(echo "$model" | tr '[:upper:]' '[:lower:]')
     case "$model_lower" in
-        *opus*)   model_color="$C_OPUS" ;;
-        *sonnet*) model_color="$C_SONNET" ;;
-        *haiku*)  model_color="$C_HAIKU" ;;
-        *)        model_color="$C_MODEL" ;;
+        *fable*)  parts+=("$(fable_rainbow "$model")") ;;
+        *opus*)   parts+=("${C_OPUS}${model}${RESET}") ;;
+        *sonnet*) parts+=("${C_SONNET}${model}${RESET}") ;;
+        *haiku*)  parts+=("${C_HAIKU}${model}${RESET}") ;;
+        *)        parts+=("${C_MODEL}${model}${RESET}") ;;
     esac
-    parts+=("${model_color}${model}${RESET}")
 fi
 
 # Ancho de terminal — Claude Code no pasa COLUMNS y el statusline corre sin TTY.
@@ -244,9 +266,9 @@ fi
 # Línea 1: rama + path + modelo (ya construido en parts[])
 # Línea 2: effort + ctx + rl (estado de la sesión)
 extras=()
-[ -n "$effort_label" ] && extras+=("${effort_color}${effort_label}${RESET}")
-[ -n "$ctx_label" ]    && extras+=("${ctx_color}${ctx_label}${RESET}")
-[ -n "$rl_label" ]     && extras+=("${rl_color}${rl_label}${RESET}")
+[ -n "$effort_short" ] && extras+=("${effort_color}${effort_short}${RESET}")
+[ -n "$ctx_short" ]    && extras+=("${ctx_color}${ctx_short}${RESET}")
+[ -n "$rl_short" ]     && extras+=("${rl_color}${rl_short}${RESET}")
 
 # Función para unir un array con el separador
 sep="${C_SEP} │ ${RESET}"
