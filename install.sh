@@ -7,6 +7,8 @@ set -e
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 USER_HOME="$HOME"
+MACHINE="$(hostname)"
+MACHINE_DIR="$REPO_DIR/machines/$MACHINE"
 
 link() {
     local src="$1" dst="$2"
@@ -19,9 +21,16 @@ link() {
     echo "  $dst -> $src"
 }
 
-echo "Instalando dotfiles-claude en $USER_HOME..."
+echo "Instalando dotfiles-claude en $USER_HOME (máquina: $MACHINE)..."
 
-link "$REPO_DIR/claude/settings.json"    "$USER_HOME/.claude/settings.json"
+# Config por máquina
+if [ -d "$MACHINE_DIR" ]; then
+    link "$MACHINE_DIR/settings.json" "$USER_HOME/.claude/settings.json"
+else
+    echo "  AVISO: no hay config para '$MACHINE' en machines/. Creá machines/$MACHINE/settings.json"
+fi
+
+# Scripts compartidos
 link "$REPO_DIR/scripts/cc-statusline.sh" "$USER_HOME/.local/bin/cc-statusline.sh"
 chmod +x "$REPO_DIR/scripts/cc-statusline.sh"
 
