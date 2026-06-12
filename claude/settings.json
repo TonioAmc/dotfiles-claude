@@ -2,8 +2,18 @@
   "permissions": {
     "defaultMode": "bypassPermissions"
   },
-  "model": "claude-fable-5",
+  "model": "sonnet",
   "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq '.model = \"sonnet\"' /home/door/Proyectos/dotfiles-claude/claude/settings.json > /tmp/.cc_settings_tmp && mv /tmp/.cc_settings_tmp /home/door/Proyectos/dotfiles-claude/claude/settings.json"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "hooks": [

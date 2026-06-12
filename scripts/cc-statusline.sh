@@ -246,7 +246,6 @@ if [ -n "$rl" ]; then
         elif [ "$rl_int" -ge 50 ]; then rl_color="$C_WARN"
         fi
         rl_short="rl:${rl_int}%"
-        rl_label="$rl_short"
         if [ -n "$rl_resets" ] && [ "$rl_resets" != "null" ]; then
             now=$(date +%s)
             secs_left=$(( ${rl_resets%.*} - now ))
@@ -254,12 +253,13 @@ if [ -n "$rl" ]; then
                 h=$(( secs_left / 3600 ))
                 m=$(( (secs_left % 3600) / 60 ))
                 if [ "$h" -gt 0 ]; then
-                    rl_label="rl:${rl_int}% (${h}h${m}m)"
+                    rl_short="rl:${rl_int}% ${h}h${m}m"
                 else
-                    rl_label="rl:${rl_int}% (${m}m)"
+                    rl_short="rl:${rl_int}% ${m}m"
                 fi
             fi
         fi
+        rl_label="$rl_short"
     fi
 fi
 
