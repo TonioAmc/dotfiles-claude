@@ -20,7 +20,7 @@
     ],
     "defaultMode": "bypassPermissions"
   },
-  "model": "sonnet",
+  "model": "opus[1m]",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -96,7 +96,7 @@
     }
   },
   "language": "espanol",
-  "effortLevel": "high",
+  "effortLevel": "xhigh",
   "voice": {
     "enabled": true,
     "mode": "hold"
