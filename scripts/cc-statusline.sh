@@ -23,7 +23,7 @@ IFS='|' read -r cwd model effort ctx_tok ctx_size ctx_pct rl rl_resets <<<"$(
 # Path corto: ~ si es home, basename si está dentro de un proyecto.
 # Si es worktree, separar nombre del repo principal y sufijo del worktree.
 short_path="${cwd/#$HOME/~}"
-worktree_label=""
+is_worktree=""
 if git -C "$cwd" rev-parse --git-dir >/dev/null 2>&1; then
     common_dir=$(git -C "$cwd" rev-parse --git-common-dir 2>/dev/null)
     case "$common_dir" in
@@ -35,10 +35,11 @@ if git -C "$cwd" rev-parse --git-dir >/dev/null 2>&1; then
     current_top=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null)
     rel=$(git -C "$cwd" rev-parse --show-prefix 2>/dev/null)
 
+    # Worktree: el toplevel actual difiere del repo principal. Solo marcamos un
+    # glifo ⎇ junto al proyecto; el nombre del directorio worktree es redundante
+    # con la rama (ambos describen la feature), así que ya no lo mostramos.
     if [ -n "$current_top" ] && [ "$current_top" != "$main_repo_path" ]; then
-        wt_name=$(basename "$current_top")
-        worktree_label="${wt_name#${main_repo_name}-}"
-        [ -z "$worktree_label" ] && worktree_label="$wt_name"
+        is_worktree=1
     fi
 
     proj="$main_repo_name"
@@ -97,10 +98,13 @@ if [ -n "$detect_root" ] && command -v ss >/dev/null 2>&1; then
     done < <(ss -tlnpH 2>/dev/null)
     if [ ${#srv_ports[@]} -gt 0 ]; then
         IFS=$'\n' srv_ports=($(sort -n <<<"${srv_ports[*]}")); unset IFS
-        # Cada puerto como URL completa para que konsole/alacritty la hagan clickeable.
+        # Hyperlink OSC 8: muestra ":PORT" corto, pero el click (ctrl+shift+click en
+        # kitty) abre la URL completa http://localhost:PORT. Así el statusline no se
+        # llena con la URL larga. visible_len() ignora estas secuencias al medir.
         server_label="🌐"
         for sp in "${srv_ports[@]}"; do
-            server_label="${server_label} http://localhost:${sp}"
+            link=$(printf '\e]8;;http://localhost:%s\e\\:%s\e]8;;\e\\' "$sp" "$sp")
+            server_label="${server_label} ${link}"
         done
     fi
 fi
@@ -150,8 +154,8 @@ if [ -n "$branch" ]; then
         parts+=("${C_BRANCH} ${branch}${RESET}")
     fi
 fi
-if [ -n "$worktree_label" ]; then
-    parts+=("${C_PATH}${short_path}${RESET} ${C_WT}⎇ ${worktree_label}${RESET}")
+if [ -n "$is_worktree" ]; then
+    parts+=("${C_WT}⎇ ${RESET}${C_PATH}${short_path}${RESET}")
 else
     parts+=("${C_PATH}${short_path}${RESET}")
 fi
@@ -159,13 +163,16 @@ if [ -n "$server_label" ]; then
     parts+=("${C_SERVER}${server_label}${RESET}")
 fi
 if [ -n "$model" ]; then
+    # Abreviar: quitar el paréntesis "(1M context)" y similares. La variante 1M es
+    # la única que usás, así que ese sufijo no aporta y antes se truncaba.
+    model_disp="${model%% (*}"
     model_lower=$(echo "$model" | tr '[:upper:]' '[:lower:]')
     case "$model_lower" in
-        *fable*)  parts+=("$(fable_rainbow "$model")") ;;
-        *opus*)   parts+=("${C_OPUS}${model}${RESET}") ;;
-        *sonnet*) parts+=("${C_SONNET}${model}${RESET}") ;;
-        *haiku*)  parts+=("${C_HAIKU}${model}${RESET}") ;;
-        *)        parts+=("${C_MODEL}${model}${RESET}") ;;
+        *fable*)  parts+=("$(fable_rainbow "$model_disp")") ;;
+        *opus*)   parts+=("${C_OPUS}${model_disp}${RESET}") ;;
+        *sonnet*) parts+=("${C_SONNET}${model_disp}${RESET}") ;;
+        *haiku*)  parts+=("${C_HAIKU}${model_disp}${RESET}") ;;
+        *)        parts+=("${C_MODEL}${model_disp}${RESET}") ;;
     esac
 fi
 
@@ -290,7 +297,9 @@ line1=$(join_parts parts)
 line2=$(join_parts extras)
 
 visible_len() {
-    echo -n "$1" | sed 's/\x1b\[[0-9;]*m//g' | wc -m
+    # Quita hyperlinks OSC 8 (\e]8;;URL\e\\ … \e]8;;\e\\) y colores CSI (\e[…m)
+    # para contar solo los caracteres realmente visibles en pantalla.
+    echo -n "$1" | sed -E 's/\x1b\]8;;[^\x1b]*\x1b\\//g; s/\x1b\[[0-9;]*m//g' | wc -m
 }
 
 len1=$(visible_len "$line1")
