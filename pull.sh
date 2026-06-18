@@ -6,6 +6,17 @@
 set -e
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Ubicacion canonica: el repo debe vivir en ~/proyectos (minuscula), junto al
+# resto de proyectos. En maquinas donde todavia este en ~/Proyectos (mayuscula)
+# u otra ruta, avisar al sincronizar para recordar la migracion pendiente.
+if [ "$REPO_DIR" != "$HOME/proyectos/dotfiles-claude" ]; then
+    echo "⚠  Este repo debería vivir en ~/proyectos/dotfiles-claude"
+    echo "   Está en: $REPO_DIR"
+    echo "   Migrá:   mv \"$REPO_DIR\" ~/proyectos/dotfiles-claude"
+    echo "            bash ~/proyectos/dotfiles-claude/install.sh"
+    echo ""
+fi
+
 prev=$(git -C "$REPO_DIR" rev-parse HEAD)
 git -C "$REPO_DIR" pull --ff-only
 
