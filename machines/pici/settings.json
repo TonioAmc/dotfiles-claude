@@ -9,7 +9,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq '.model = \"sonnet\"' $HOME/Proyectos/dotfiles-claude/claude/settings.json > /tmp/.cc_settings_tmp && mv /tmp/.cc_settings_tmp $HOME/Proyectos/dotfiles-claude/claude/settings.json"
+            "command": "jq '.model = \"sonnet\"' $HOME/proyectos/dotfiles-claude/claude/settings.json > /tmp/.cc_settings_tmp && mv /tmp/.cc_settings_tmp $HOME/proyectos/dotfiles-claude/claude/settings.json"
           }
         ]
       }

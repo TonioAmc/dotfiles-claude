@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Actualiza dotfiles-claude en el equipo actual (git pull).
 # Uso local:  bash pull.sh
-# Uso remoto: ssh <host> "bash ~/Proyectos/dotfiles-claude/pull.sh"
+# Uso remoto: ssh <host> "bash ~/proyectos/dotfiles-claude/pull.sh"
 
 set -e
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
