@@ -40,7 +40,7 @@ Hace `git pull --ff-only` y avisa si algún `settings.json` cambió (requiere
 claude/settings.json          # template base (no se symlinkea; referencia heredada)
 machines/<hostname>/settings.json   # config por máquina (la que se enlaza)
 scripts/cc-statusline.sh      # statusline: rama, path, modelo, contexto, dev server
-scripts/hooks/                # scripts que los settings.json invocan como hooks
+scripts/hooks/                # scripts que enchufan Claude al sistema (hooks + glue de escritorio)
 install.sh                    # crea los symlinks de esta máquina
 pull.sh                       # actualiza + avisa
 ```
@@ -48,6 +48,15 @@ pull.sh                       # actualiza + avisa
 Cada máquina diverge en su carpeta de `machines/` (modelo, effort, hooks). Editar
 `~/.claude/settings.json` edita el repo directamente (es un symlink); commit + push y
 las demás máquinas lo reciben con `pull.sh`.
+
+> **Nota sobre `scripts/hooks/`:** la mayoría son hooks que `settings.json` invoca por
+> nombre, pero la carpeta también guarda *glue* de escritorio que **no** llama Claude
+> Code directamente. Ej.: `claude-notify-jump.sh`, que dispara el bind `Super+Space` de
+> Hyprland para saltar a la sesión de Claude que notificó. Vive acá —y no en una config
+> de Hyprland— porque está acoplado a los scripts de notificación (lee el registro que
+> escribe `claude-notify-action.sh`), no hay otro repo de dotfiles del sistema, e
+> `install.sh` lo enlaza junto al resto. El bind en sí vive en `hyprland.conf` (local,
+> no versionado).
 
 ## Máquinas
 
