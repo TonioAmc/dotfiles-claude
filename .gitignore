@@ -1,0 +1,6 @@
+# Artefactos de Python (py_compile sobre los hooks .py)
+__pycache__/
+*.pyc
+
+# Backups que deja install.sh al reemplazar un archivo no-symlink
+*.bak

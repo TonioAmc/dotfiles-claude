@@ -34,10 +34,19 @@ echo '{"workspace":{"current_dir":"'"$PWD"'"},"model":{"display_name":"Opus 4.8"
 ## Arquitectura
 
 **Config por máquina.** `install.sh` autodetecta su ubicación (`REPO_DIR` relativo,
-por eso el repo se puede mover sin romper nada) y crea dos symlinks:
+por eso el repo se puede mover sin romper nada) y crea los symlinks:
 
 - `machines/$(hostname)/settings.json` → `~/.claude/settings.json`
 - `scripts/cc-statusline.sh` → `~/.local/bin/cc-statusline.sh`
+- cada archivo de `scripts/hooks/` → `~/.local/bin/<nombre>` (uno por uno)
+
+**Scripts de hooks.** Los `settings.json` invocan hooks por nombre en `~/.local/bin/`
+(`hmail-hook.sh`, `claude-inhibit-{start,stop}.sh`, `claude-edit-snap.sh`,
+`disable-claude-mcps.py`). Esos scripts viven en `scripts/hooks/` y se symlinkean a
+`~/.local/bin/`, así una máquina nueva no queda con hooks que apuntan a archivos
+inexistentes. Son **compartidos** entre máquinas; cada `settings.json` decide cuáles
+activa (p. ej. `pici` usa un subconjunto). `claude-edit-snap.sh` tiene paths
+`/home/antolin/...` hardcodeados — portable solo entre máquinas con el mismo usuario.
 
 Cada host tiene su carpeta en `machines/` con un `settings.json` propio, así divergen
 sin pisarse: p. ej. `noti` (laptop) usa `opus[1m]` + effort `xhigh` + todos los hooks;

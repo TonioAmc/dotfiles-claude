@@ -34,4 +34,11 @@ fi
 link "$REPO_DIR/scripts/cc-statusline.sh" "$USER_HOME/.local/bin/cc-statusline.sh"
 chmod +x "$REPO_DIR/scripts/cc-statusline.sh"
 
+# Scripts de hooks (los settings.json los referencian por nombre en ~/.local/bin/)
+for hook in "$REPO_DIR"/scripts/hooks/*; do
+    [ -e "$hook" ] || continue
+    link "$hook" "$USER_HOME/.local/bin/$(basename "$hook")"
+    chmod +x "$hook"
+done
+
 echo "Listo."

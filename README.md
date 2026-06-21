@@ -20,6 +20,7 @@ bash install.sh
 |---|---|
 | `~/.claude/settings.json` | `machines/<hostname>/settings.json` |
 | `~/.local/bin/cc-statusline.sh` | `scripts/cc-statusline.sh` |
+| `~/.local/bin/<cada hook>.sh` | `scripts/hooks/<cada hook>` |
 
 Si no existe `machines/<hostname>/`, avisa para que crees esa carpeta con el
 `settings.json` de la máquina nueva.
@@ -39,6 +40,7 @@ Hace `git pull --ff-only` y avisa si algún `settings.json` cambió (requiere
 claude/settings.json          # template base (no se symlinkea; referencia heredada)
 machines/<hostname>/settings.json   # config por máquina (la que se enlaza)
 scripts/cc-statusline.sh      # statusline: rama, path, modelo, contexto, dev server
+scripts/hooks/                # scripts que los settings.json invocan como hooks
 install.sh                    # crea los symlinks de esta máquina
 pull.sh                       # actualiza + avisa
 ```
