@@ -5,6 +5,14 @@
 > cuerpo enriquecido: idle = extracto del transcript, permiso = herramienta+comando leídos
 > del diálogo de la TUI vía `get-text` (el tool_use pendiente NO está en el transcript al
 > notificar). Detalle en memoria `reference_claude_notificaciones`. Lo de abajo es histórico.
+>
+> **FASE 5 — COMPLETADO (2026-06-21):** manejo de "2 notis seguidas" + quitar botón.
+> (a) Coalescing por sesión (tag `x-canonical-private-synchronous:claude-<session_id>` → la notif
+> nueva de la misma sesión reemplaza la vieja). (b) Idle con `-t 12000` (12s en pantalla) para
+> ciclar cómodo. (c) Botón "Ir a la sesión" quitado; `Super+Space` ahora corre `claude-notify-jump.sh`
+> (lee un registro `$XDG_RUNTIME_DIR/claude-notify/` que escribe el listener, salta a la sesión que
+> espera, más nueva primero, repetir para ciclar). Bind en `hyprland.conf` (local). Detalle completo
+> en memoria `reference_claude_notificaciones` (sección Fase 5).
 
 Continuación del rediseño de las notificaciones de Claude Code en Hyprland.
 Fases 1-3 hechas. Esto es lo que falta (lo pidió el usuario para un chat nuevo).

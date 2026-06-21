@@ -21,6 +21,7 @@ cwd="$(get '.cwd')"
 ntype="$(get '.notification_type')"
 message="$(get '.message')"
 transcript="$(get '.transcript_path')"
+session="$(get '.session_id')"
 proj="$(basename "${cwd:-$HOME}")"
 [ "$proj" = "antolin" ] && proj="home"
 
@@ -100,6 +101,10 @@ last_text() {
 }
 
 # ---------- Mapear motivo → título / cuerpo / urgencia ----------
+# timeout: ms que la notif queda EN PANTALLA (vacío = default de swaync, 6s normal /
+# 20s critical). Ensanchamos las idle a 12s para que dé tiempo a ciclar con Super+Space
+# entre varias sesiones antes de que se vayan al panel (ver memoria, "2 notis seguidas").
+timeout=""
 case "$ntype" in
   permission_prompt)
     title="🔐 Claude pide permiso · $proj"
@@ -120,6 +125,7 @@ case "$ntype" in
   idle_prompt)
     title="Claude te espera · $proj"
     urgency="normal"
+    timeout="12000"
     tx="$(last_text)"
     if [ -n "$tx" ]; then
       body="$(esc "$(shorten "$tx" 160)")"
@@ -141,6 +147,9 @@ case "$ntype" in
 esac
 
 # ---------- Emitir vía listener desacoplado (notify-send --action bloquea) ----------
+# CN_SESSION → tag synchronous (swaync reemplaza la notif previa de la MISMA sesión en vez
+# de apilar otra). CN_TIMEOUT → ms en pantalla (ver arriba).
 export CN_ICON="$ICON" CN_URG="$urgency" CN_TITLE="$title" CN_BODY="$body" CN_ADDR="$addr"
+export CN_SESSION="$session" CN_TIMEOUT="$timeout"
 setsid "$HOME/.local/bin/claude-notify-action.sh" >/dev/null 2>&1 < /dev/null &
 exit 0
