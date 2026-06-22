@@ -4,11 +4,16 @@
 # Calcula la ventana de Hyprland de ESTA sesión para poder "saltar a la consola".
 # Lanza un listener desacoplado (claude-notify-action.sh) que espera el click/acción.
 # El cuerpo se enriquece (el campo .message del payload es siempre genérico,
-# "Claude needs your permission"):
+# "Claude needs your permission", e idéntico para todo lo que llega como
+# notification_type=permission_prompt, así que NO sirve para distinguir):
 #  - idle  → extracto de lo último que dijo Claude, leído del transcript .jsonl.
-#  - permiso → herramienta + comando a aprobar, leídos del diálogo de la TUI vía
-#    kitty get-text (el tool_use pendiente NO está aún en el transcript: Claude lo
-#    escribe recién al resolver el permiso, verificado en Fase 4).
+#  - permission_prompt → llega igual para 3 cosas distintas; se desambiguan así:
+#      · AskUserQuestion → "❓ Claude pregunta" + la pregunta (del transcript: el
+#        tool_use SÍ está grabado al notificar, ~6s antes — verificado Fase 6).
+#      · ExitPlanMode    → "📋 Claude propone un plan" + extracto del plan (transcript).
+#      · permiso de tool real → "🔐 Claude pide permiso" + herramienta + comando,
+#        raspados del diálogo de la TUI vía kitty get-text (este tool_use NO está
+#        en el transcript hasta resolverse, por eso se lee de la pantalla).
 # Lee el payload JSON por stdin. Doc: memoria reference_claude_notificaciones.
 set -u
 
@@ -72,8 +77,10 @@ find_kitty_win() {
 # Lee el diálogo de permiso de la TUI y devuelve sus líneas útiles: header
 # (p.ej. "Bash command", "Edit file") + detalle (el comando o el archivo). Ancla
 # en "Do you want to proceed?" y aísla el cuadro reseteando en cada separador
-# horizontal (así descarta el "● Bash(…)" y "⎿ Waiting…" de arriba). Reintenta
-# por si la TUI todavía no pintó el diálogo al dispararse el hook.
+# horizontal (así descarta el "● Bash(…)" y "⎿ Waiting…" de arriba). Toma la
+# ÚLTIMA ocurrencia del ancla (el diálogo está al final del get-text): así el
+# scrollback de arriba —que puede contener esa misma frase de pasada— no lo pisa.
+# Reintenta por si la TUI todavía no pintó el diálogo al dispararse el hook.
 scrape_pending() {
   [ -n "$kitty_win" ] || return 0
   local txt i=0
@@ -84,13 +91,40 @@ scrape_pending() {
   done
   case "$txt" in *"Do you want to proceed"*) ;; *) return 0 ;; esac
   printf '%s\n' "$txt" | awk '
-    /Do you want to proceed/ { for (j=1;j<=c;j++) print b[j]; exit }
-    /^[[:space:]]*[─━]{3,}/  { c=0; next }
-    {
-      line=$0; gsub(/^[[:space:]]+|[[:space:]]+$/,"",line)
-      if (line=="" || line ~ /^[│┃|╭╮╰╯]+$/) next
-      c++; b[c]=line
+    { raw[NR]=$0 }
+    END {
+      last=0
+      for (i=1;i<=NR;i++) if (raw[i] ~ /Do you want to proceed/) last=i
+      if (last==0) exit
+      start=1
+      for (i=last-1;i>=1;i--) if (raw[i] ~ /^[[:space:]]*[─━]{3,}/) { start=i+1; break }
+      for (i=start;i<last;i++) {
+        line=raw[i]
+        gsub(/^[[:space:]│┃]+|[[:space:]│┃]+$/,"",line)   # trim espacios + bordes laterales
+        if (line=="" || line ~ /^[|╭╮╰╯─━]+$/) continue
+        print line
+      }
     }'
+}
+# ¿Hay un menú/plan pendiente de respuesta del usuario? A diferencia de los permisos
+# de tool (cuyo tool_use NO está en el transcript hasta resolverse), AskUserQuestion y
+# ExitPlanMode SÍ se escriben al transcript al pedir input (verificado: el tool_use se
+# graba ~6s antes de que dispare el hook). Distingue ambos del permiso real, que llega
+# con el MISMO notification_type/message genérico. Imprime "ASK\t<pregunta>" o
+# "PLAN\t<plan>"; vacío si el último tool_use ya está resuelto (= es un permiso real).
+pending_menu() {
+  [ -n "$transcript" ] && [ -f "$transcript" ] || return 0
+  jq -rs '
+    ([ .[] | select(.type=="assistant") | .message.content[]?
+        | select(.type=="tool_use") ] | last) as $tu
+    | if $tu == null then empty else
+        ([ .[] | (.message.content // []) | if type=="array" then .[] else empty end
+            | select(.type=="tool_result") | .tool_use_id ]) as $done
+        | if ($done | index($tu.id)) then empty           # último tool_use ya resuelto
+          elif $tu.name=="AskUserQuestion" then "ASK\t" + (($tu.input.questions[0].question) // "")
+          elif $tu.name=="ExitPlanMode"    then "PLAN\t" + (($tu.input.plan) // "")
+          else empty end
+      end' "$transcript" 2>/dev/null
 }
 # Último bloque de texto del asistente → para el extracto del idle.
 last_text() {
@@ -107,21 +141,39 @@ last_text() {
 timeout=""
 case "$ntype" in
   permission_prompt)
-    title="🔐 Claude pide permiso · $proj"
-    urgency="critical"
-    kitty_win="$(find_kitty_win)"
-    mapfile -t PL < <(scrape_pending)
-    if [ "${#PL[@]}" -gt 0 ]; then
-      tool="${PL[0]%% *}"                    # "Bash" de "Bash command"
-      detail="${PL[1]:-}"; detail="${detail//$HOME/\~}"
-      if [ -n "$detail" ]; then
-        body="<b>$(esc "$tool")</b> · $(esc "$(shorten "$detail" 90)")"
-      else
-        body="<b>$(esc "$(shorten "${PL[0]}" 90)")</b>"
-      fi
-    else
-      body="$(esc "${message:-Necesito tu permiso para continuar}")"
-    fi ;;
+    # permission_prompt llega IGUAL (mismo notification_type y message genérico) para
+    # tres cosas distintas: una pregunta (AskUserQuestion), un plan (ExitPlanMode) y un
+    # permiso de tool real. El transcript las distingue: si hay un menú/plan pendiente,
+    # lo leemos de ahí (robusto); si no, es un permiso real y rascamos la TUI.
+    menu="$(pending_menu)"
+    kind="${menu%%$'\t'*}"; mtext="${menu#*$'\t'}"
+    [ "$kind" = "$menu" ] && kind=""         # sin tab → no es menú
+    case "$kind" in
+      ASK)
+        title="❓ Claude pregunta · $proj"
+        urgency="normal"
+        body="$(esc "$(shorten "${mtext:-Necesito que elijas una opción}" 160)")" ;;
+      PLAN)
+        title="📋 Claude propone un plan · $proj"
+        urgency="normal"
+        body="$(esc "$(shorten "${mtext:-Revisá el plan que propongo}" 160)")" ;;
+      *)
+        title="🔐 Claude pide permiso · $proj"
+        urgency="critical"
+        kitty_win="$(find_kitty_win)"
+        mapfile -t PL < <(scrape_pending)
+        if [ "${#PL[@]}" -gt 0 ]; then
+          tool="${PL[0]%% *}"                # "Bash" de "Bash command"
+          detail="${PL[1]:-}"; detail="${detail//$HOME/\~}"
+          if [ -n "$detail" ]; then
+            body="<b>$(esc "$tool")</b> · $(esc "$(shorten "$detail" 90)")"
+          else
+            body="<b>$(esc "$(shorten "${PL[0]}" 90)")</b>"
+          fi
+        else
+          body="$(esc "${message:-Necesito tu permiso para continuar}")"
+        fi ;;
+    esac ;;
   idle_prompt)
     title="Claude te espera · $proj"
     urgency="normal"
