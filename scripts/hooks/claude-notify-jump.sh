@@ -40,16 +40,12 @@ for f in $(ls -t "$REG"/ 2>/dev/null); do
     rm -f "$path"; continue
   fi
   hyprctl dispatch focuswindow "address:$addr" >/dev/null 2>&1
-  # Cerrar la notif a la que saltamos (el --wait de su listener retorna y se autolimpia).
+  # Cerrar SÓLO esta notif (la más reciente = la de arriba); su listener retorna y se
+  # autolimpia. Las demás quedan en pie: al cerrarse ésta swaync sube la siguiente al
+  # borde, y el próximo Super+Space la saldará. Con el registro por sesión (Fase 6) hay
+  # una entrada por notif, así que basta borrar la propia.
   close_notif "$nid"
-  # Consumir TODAS las entradas de esta ventana (el coalescing de una misma sesión puede
-  # dejar varias): así un solo Super+Space la salda y el próximo va a la SIGUIENTE sesión,
-  # no de vuelta a la misma.
-  for g in "$REG"/*; do
-    [ -f "$g" ] || continue
-    graw="$(cat "$g" 2>/dev/null)"; gaddr="${graw%%$'\t'*}"
-    [ "$gaddr" = "$addr" ] && rm -f "$g"
-  done
+  rm -f "$path"
   exit 0
 done
 exit 0
