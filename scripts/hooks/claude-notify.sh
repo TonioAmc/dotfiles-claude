@@ -133,12 +133,22 @@ last_text() {
              | select(.type=="text") | .text ]
     | if length==0 then empty else last end' "$transcript" 2>/dev/null
 }
+# 3ª línea "qué se está haciendo" (Fase 7): el último texto del asistente, recortado y
+# en <small> tenue debajo de lo que pide. Devuelve "\n<small>↳ …</small>" (ya escapado)
+# o vacío si no hay texto. Se antepone un \n real para separarla de la línea de arriba.
+ctx_line() {
+  local tx; tx="$(last_text)"
+  [ -n "$tx" ] || return 0
+  printf '\n<small>↳ %s</small>' "$(esc "$(shorten "$tx" 70)")"
+}
 
-# ---------- Mapear motivo → título / cuerpo / urgencia ----------
-# timeout: ms que la notif queda EN PANTALLA (vacío = default de swaync, 6s normal /
-# 20s critical). Ensanchamos las idle a 12s para que dé tiempo a ciclar con Super+Space
-# entre varias sesiones antes de que se vayan al panel (ver memoria, "2 notis seguidas").
-timeout=""
+# ---------- Mapear motivo → summary / cuerpo / urgencia ----------
+# Fase 7: notif compacta y persistente. summary = "<emoji> proyecto" (corto); cuerpo =
+# qué pide (línea 1) + qué se está haciendo (línea 2 tenive vía ctx_line). timeout=0 → no
+# expira sola; se quita con Super+Alt+Space o se salta con Super+Space (ver scripts jump).
+# urgencia normal para todo (discreta): se quitó el critical para que sea suave, ahora que
+# es persistente. El summary NO renderiza markup; el cuerpo sí (<b>/<small>).
+timeout="0"
 case "$ntype" in
   permission_prompt)
     # permission_prompt llega IGUAL (mismo notification_type y message genérico) para
@@ -148,54 +158,54 @@ case "$ntype" in
     menu="$(pending_menu)"
     kind="${menu%%$'\t'*}"; mtext="${menu#*$'\t'}"
     [ "$kind" = "$menu" ] && kind=""         # sin tab → no es menú
+    urgency="normal"
     case "$kind" in
       ASK)
-        title="❓ Claude pregunta · $proj"
-        urgency="normal"
-        body="$(esc "$(shorten "${mtext:-Necesito que elijas una opción}" 160)")" ;;
+        title="❓ $proj"
+        body="$(esc "$(shorten "${mtext:-Necesito que elijas una opción}" 130)")$(ctx_line)" ;;
       PLAN)
-        title="📋 Claude propone un plan · $proj"
-        urgency="normal"
-        body="$(esc "$(shorten "${mtext:-Revisá el plan que propongo}" 160)")" ;;
+        title="📋 $proj"
+        body="$(esc "$(shorten "${mtext:-Revisá el plan que propongo}" 130)")$(ctx_line)" ;;
       *)
-        title="🔐 Claude pide permiso · $proj"
-        urgency="critical"
+        title="🔐 $proj"
         kitty_win="$(find_kitty_win)"
         mapfile -t PL < <(scrape_pending)
         if [ "${#PL[@]}" -gt 0 ]; then
           tool="${PL[0]%% *}"                # "Bash" de "Bash command"
           detail="${PL[1]:-}"; detail="${detail//$HOME/\~}"
           if [ -n "$detail" ]; then
-            body="<b>$(esc "$tool")</b> · $(esc "$(shorten "$detail" 90)")"
+            line1="<b>$(esc "$tool")</b> · $(esc "$(shorten "$detail" 80)")"
           else
-            body="<b>$(esc "$(shorten "${PL[0]}" 90)")</b>"
+            line1="<b>$(esc "$(shorten "${PL[0]}" 80)")</b>"
           fi
         else
-          body="$(esc "${message:-Necesito tu permiso para continuar}")"
-        fi ;;
+          line1="$(esc "${message:-Necesito tu permiso para continuar}")"
+        fi
+        body="${line1}$(ctx_line)" ;;
     esac ;;
   idle_prompt)
-    title="Claude te espera · $proj"
+    # idle: lo que pide y lo que se está haciendo son lo mismo (el último texto), así que
+    # va en una sola línea sin ctx_line.
+    title="⏳ $proj"
     urgency="normal"
-    timeout="12000"
     tx="$(last_text)"
     if [ -n "$tx" ]; then
-      body="$(esc "$(shorten "$tx" 160)")"
+      body="$(esc "$(shorten "$tx" 140)")"
     else
       body="$(esc "${message:-Terminé y te espero}")"
     fi ;;
   elicitation_dialog)
-    title="Claude pregunta · $proj"
-    body="$(esc "${message:-Necesito que elijas una opción}")"
-    urgency="normal" ;;
+    title="❓ $proj"
+    urgency="normal"
+    body="$(esc "${message:-Necesito que elijas una opción}")$(ctx_line)" ;;
   auth_success)
-    title="Claude · $proj"
-    body="$(esc "${message:-Autenticación completada}")"
-    urgency="low" ;;
+    title="✓ $proj"
+    urgency="low"
+    body="$(esc "${message:-Autenticación completada}")" ;;
   *)
-    title="Claude · $proj"
-    body="$(esc "${message:-Te espera}")"
-    urgency="normal" ;;
+    title="$proj"
+    urgency="normal"
+    body="$(esc "${message:-Te espera}")$(ctx_line)" ;;
 esac
 
 # ---------- Emitir vía listener desacoplado (notify-send --action bloquea) ----------
