@@ -12,6 +12,11 @@ TIMER_PID=${CLAUDE_INHIBIT_TIMER:-/tmp/claude-suspend-timer.pid}
 ACTIVE_DIR=${CLAUDE_ACTIVE_DIR:-/tmp/claude-active.d}
 LID_FILE=${CLAUDE_LID_FILE:-/proc/acpi/button/lid/LID0/state}
 SUSPEND_DELAY=${CLAUDE_SUSPEND_DELAY:-60}
+# Vencimiento del marcador de sesión (heartbeat): un marcador no refrescado en
+# este lapso deja de contar como "trabajando". Cubre turnos que no terminan en
+# Stop (AskUserQuestion, sesión dejada a medias): sin esto, un marcador pegado
+# bloquea la suspensión indefinidamente y drena la batería con la tapa cerrada.
+ACTIVE_TTL=${CLAUDE_ACTIVE_TTL:-600}
 SUSPEND_CMD=${CLAUDE_SUSPEND_CMD:-"dbus-send --system --print-reply --dest=org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager.Suspend boolean:false"}
 LOG=/tmp/claude-inhibit.log
 DEBUG_FLAG=/tmp/claude-inhibit-debug
@@ -85,15 +90,20 @@ log "inhibidor lanzado PID=$INHIB_NEW"
     # Cuenta sesiones activas y de paso purga marcadores huérfanos
     # (sesión que murió sin disparar Stop). Dir vacío/ausente -> 0.
     active_sessions() {
-        local n=0 m pid
+        local n=0 m pid now mtime
+        now=$(date +%s)
         for m in "$ACTIVE_DIR"/*; do
             [ -e "$m" ] || continue
             pid=${m##*/}
-            if kill -0 "$pid" 2>/dev/null; then
-                n=$((n+1))
-            else
-                rm -f "$m"
+            if ! kill -0 "$pid" 2>/dev/null; then
+                rm -f "$m"          # sesión muerta: purgar marcador
+                continue
             fi
+            mtime=$(stat -c %Y "$m" 2>/dev/null || echo 0)
+            # Solo cuenta si hubo actividad reciente. Un marcador "pegado"
+            # (turno sin Stop) deja de refrescarse y tras ACTIVE_TTL ya no
+            # bloquea la suspensión. No se borra: puede volver a refrescarse.
+            [ $(( now - mtime )) -le "$ACTIVE_TTL" ] && n=$((n+1))
         done
         echo "$n"
     }
