@@ -30,6 +30,11 @@ else
     echo "  AVISO: no hay config para '$MACHINE' en machines/. Creá machines/$MACHINE/settings.json"
 fi
 
+# Keybindings por máquina (opcional: solo las máquinas que tengan uno propio)
+if [ -f "$MACHINE_DIR/keybindings.json" ]; then
+    link "$MACHINE_DIR/keybindings.json" "$USER_HOME/.claude/keybindings.json"
+fi
+
 # Scripts compartidos
 link "$REPO_DIR/scripts/cc-statusline.sh" "$USER_HOME/.local/bin/cc-statusline.sh"
 chmod +x "$REPO_DIR/scripts/cc-statusline.sh"
