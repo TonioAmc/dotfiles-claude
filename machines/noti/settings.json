@@ -49,6 +49,16 @@
     ],
     "PreToolUse": [
       {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.local/bin/claude-inhibit-touch.sh",
+            "async": true
+          }
+        ]
+      },
+      {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
           {
@@ -89,7 +99,8 @@
   },
   "enabledPlugins": {
     "skill-creator@claude-plugins-official": false,
-    "learning-mode@antolin-plugins": true
+    "learning-mode@antolin-plugins": true,
+    "clangd-lsp@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "claude-code-workflows": {
