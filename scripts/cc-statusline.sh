@@ -146,37 +146,43 @@ fable_rainbow() {
     printf '%s%s' "$result" "$RESET"
 }
 
-parts=()
-if [ -n "$branch" ]; then
-    if [[ "$branch" == *"*" ]]; then
-        parts+=("${C_DIRTY} ${branch}${RESET}")
-    else
-        parts+=("${C_BRANCH} ${branch}${RESET}")
-    fi
-fi
-if [ -n "$is_worktree" ]; then
-    parts+=("${C_WT}⎇ ${RESET}${C_PATH}${short_path}${RESET}")
-else
-    parts+=("${C_PATH}${short_path}${RESET}")
-fi
-if [ -n "$server_label" ]; then
-    parts+=("${C_SERVER}${server_label}${RESET}")
-fi
-if [ -n "$model" ]; then
-    # Abreviar: quitar el paréntesis "(1M context)" y similares. La variante 1M es
-    # la única que usás, así que ese sufijo no aporta y antes se truncaba.
-    model_disp="${model%% (*}"
-    model_lower=$(echo "$model" | tr '[:upper:]' '[:lower:]')
-    case "$model_lower" in
-        *fable*)  parts+=("$(fable_rainbow "$model_disp")") ;;
-        *opus*)   parts+=("${C_OPUS}${model_disp}${RESET}") ;;
-        *sonnet*) parts+=("${C_SONNET}${model_disp}${RESET}") ;;
-        *haiku*)  parts+=("${C_HAIKU}${model_disp}${RESET}") ;;
-        *)        parts+=("${C_MODEL}${model_disp}${RESET}") ;;
-    esac
-fi
+# --- Helpers de ancho (definidos arriba: se usan para presupuestar la rama antes de
+# --- construir la línea, no solo al final para decidir 1 vs 2 líneas).
+sep="${C_SEP} │ ${RESET}"
+SEP_VLEN=3                 # ancho visible de " │ "
+
+# Une un array con el separador.
+join_parts() {
+    local -n arr=$1
+    local result=""
+    for p in "${arr[@]}"; do
+        [ -n "$result" ] && result="${result}${sep}"
+        result="${result}${p}"
+    done
+    printf '%s' "$result"
+}
+
+# Longitud visible (sin ANSI ni hyperlinks OSC 8) de un string coloreado.
+visible_len() {
+    # Quita hyperlinks OSC 8 (\e]8;;URL\e\\ … \e]8;;\e\\) y colores CSI (\e[…m)
+    # para contar solo los caracteres realmente visibles en pantalla.
+    echo -n "$1" | sed -E 's/\x1b\]8;;[^\x1b]*\x1b\\//g; s/\x1b\[[0-9;]*m//g' | wc -m
+}
+
+# Trunca un texto a `max` caracteres con elipsis en el MEDIO, preservando prefijo y
+# sufijo. Para ramas tipo `fix/…-liquidaciones` esto conserva el tipo (fix/feat) y la
+# parte distintiva del final, que es lo informativo. El `*` de dirty queda en el sufijo.
+truncate_mid() {
+    local s="$1" max="$2" n=${#1}
+    [ "$n" -le "$max" ] && { printf '%s' "$s"; return; }
+    [ "$max" -lt 3 ] && { printf '%s' "${s:0:max}"; return; }
+    local keep=$(( max - 1 )) head tail   # 1 carácter para la elipsis …
+    head=$(( (keep + 1) / 2 )); tail=$(( keep - head ))
+    printf '%s…%s' "${s:0:head}" "${s: -tail}"
+}
 
 # Ancho de terminal — Claude Code no pasa COLUMNS y el statusline corre sin TTY.
+# Se resuelve ACÁ (antes de armar la línea) porque el presupuesto de la rama lo necesita.
 # Estrategia en cascada:
 #   1) kitty vía remote control (cacheado 1s para no spamear cuando refresca seguido).
 #   2) Subir el árbol de procesos hasta el proceso de Claude Code (que sí tiene el
@@ -220,6 +226,59 @@ if [ -z "$cols" ]; then
 fi
 
 [ -z "$cols" ] && cols=${COLUMNS:-$(tput cols 2>/dev/null || echo 200)}
+
+# --- Construir la línea 1 ---
+# Primero los elementos que van DESPUÉS de la rama (proyecto/worktree, server, modelo):
+# son los que el usuario quiere ver siempre. Medimos su ancho y le damos a la rama el
+# espacio que sobra hasta `cols`; si no entra, la truncamos. Así un nombre de rama largo
+# (p.ej. fix/tarjeta-boletas-cuenta-liquidaciones) nunca empuja el modelo/puertos fuera.
+rest_parts=()
+if [ -n "$is_worktree" ]; then
+    rest_parts+=("${C_WT}⎇ ${RESET}${C_PATH}${short_path}${RESET}")
+else
+    rest_parts+=("${C_PATH}${short_path}${RESET}")
+fi
+if [ -n "$server_label" ]; then
+    rest_parts+=("${C_SERVER}${server_label}${RESET}")
+fi
+if [ -n "$model" ]; then
+    # Abreviar: quitar el paréntesis "(1M context)" y similares. La variante 1M es
+    # la única que usás, así que ese sufijo no aporta y antes se truncaba.
+    model_disp="${model%% (*}"
+    model_lower=$(echo "$model" | tr '[:upper:]' '[:lower:]')
+    case "$model_lower" in
+        *fable*)  rest_parts+=("$(fable_rainbow "$model_disp")") ;;
+        *opus*)   rest_parts+=("${C_OPUS}${model_disp}${RESET}") ;;
+        *sonnet*) rest_parts+=("${C_SONNET}${model_disp}${RESET}") ;;
+        *haiku*)  rest_parts+=("${C_HAIKU}${model_disp}${RESET}") ;;
+        *)        rest_parts+=("${C_MODEL}${model_disp}${RESET}") ;;
+    esac
+fi
+
+# Presupuesto para la rama: lo que sobra en `cols` tras el resto de L1. Descontamos el
+# ancho visible del resto, un separador rama→resto (SEP_VLEN), el espacio inicial de la
+# rama (1) y un margen (1). Solo truncamos si la rama no entra y hay al menos sitio para
+# un prefijo legible; si el presupuesto es ínfimo (ventana diminuta) dejamos un piso.
+btext="$branch"
+if [ -n "$branch" ] && [ ${#rest_parts[@]} -gt 0 ]; then
+    rest_joined=$(join_parts rest_parts)
+    rest_len=$(visible_len "$rest_joined")
+    branch_budget=$(( cols - rest_len - SEP_VLEN - 2 ))
+    [ "$branch_budget" -lt 10 ] && branch_budget=10   # piso: prefijo + elipsis + algo de cola
+    if [ "${#btext}" -gt "$branch_budget" ]; then
+        btext=$(truncate_mid "$btext" "$branch_budget")
+    fi
+fi
+
+parts=()
+if [ -n "$branch" ]; then
+    if [[ "$branch" == *"*" ]]; then
+        parts+=("${C_DIRTY} ${btext}${RESET}")
+    else
+        parts+=("${C_BRANCH} ${btext}${RESET}")
+    fi
+fi
+parts+=("${rest_parts[@]}")
 
 # Effort, ctx, rl: preparar etiqueta normal + compacta
 effort_label=""; effort_short=""; effort_color="$C_MODEL"
@@ -273,34 +332,15 @@ if [ -n "$rl" ]; then
     fi
 fi
 
-# Línea 1: rama + path + modelo (ya construido en parts[])
+# Línea 1: rama + path + server + modelo (ya construido en parts[])
 # Línea 2: effort + ctx + rl (estado de la sesión)
 extras=()
 [ -n "$effort_short" ] && extras+=("${effort_color}${effort_short}${RESET}")
 [ -n "$ctx_short" ]    && extras+=("${ctx_color}${ctx_short}${RESET}")
 [ -n "$rl_short" ]     && extras+=("${rl_color}${rl_short}${RESET}")
 
-# Función para unir un array con el separador
-sep="${C_SEP} │ ${RESET}"
-join_parts() {
-    local -n arr=$1
-    local result=""
-    for p in "${arr[@]}"; do
-        [ -n "$result" ] && result="${result}${sep}"
-        result="${result}${p}"
-    done
-    printf '%s' "$result"
-}
-
-# Calcular longitud visible (sin ANSI) de la línea 1 completa
 line1=$(join_parts parts)
 line2=$(join_parts extras)
-
-visible_len() {
-    # Quita hyperlinks OSC 8 (\e]8;;URL\e\\ … \e]8;;\e\\) y colores CSI (\e[…m)
-    # para contar solo los caracteres realmente visibles en pantalla.
-    echo -n "$1" | sed -E 's/\x1b\]8;;[^\x1b]*\x1b\\//g; s/\x1b\[[0-9;]*m//g' | wc -m
-}
 
 len1=$(visible_len "$line1")
 len2=$(visible_len "$line2")
