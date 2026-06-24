@@ -143,12 +143,12 @@ ctx_line() {
 }
 
 # ---------- Mapear motivo → summary / cuerpo / urgencia ----------
-# Fase 7: notif compacta y persistente. summary = "<emoji> proyecto" (corto); cuerpo =
-# qué pide (línea 1) + qué se está haciendo (línea 2 tenive vía ctx_line). timeout=0 → no
-# expira sola; se quita con Super+Alt+Space o se salta con Super+Space (ver scripts jump).
-# urgencia normal para todo (discreta): se quitó el critical para que sea suave, ahora que
-# es persistente. El summary NO renderiza markup; el cuerpo sí (<b>/<small>).
-timeout="0"
+# Fase 7: notif compacta. summary = "<emoji> proyecto" (corto); cuerpo = qué pide (línea 1)
+# + qué se está haciendo (línea 2 tenue vía ctx_line). timeout=12000 → 12s en pantalla y
+# luego al panel; se quita antes con Super+Alt+Space o se salta con Super+Space (ver scripts
+# jump). urgencia normal para todo (discreta y suave, sin critical: no atraviesa No Molestar).
+# El summary NO renderiza markup; el cuerpo sí (<b>/<small>).
+timeout="12000"
 case "$ntype" in
   permission_prompt)
     # permission_prompt llega IGUAL (mismo notification_type y message genérico) para

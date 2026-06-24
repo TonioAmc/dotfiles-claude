@@ -3,8 +3,8 @@
 #   Super+Space        → modo "jump"    : salta a la sesión de Claude que espera y cierra
 #                        esa notif. Si NO hay ninguna notif viva → abre el panel de swaync.
 #   Super+Alt+Space    → modo "dismiss" (con --dismiss): cierra la notif de arriba SIN saltar.
-#                        Si no hay ninguna → no hace nada (es el modo de sacarlas, ya que las
-#                        notifs ahora son persistentes y no expiran solas).
+#                        Si no hay ninguna → no hace nada (sirve para sacar una notif de
+#                        pantalla antes de que expire sola a los 12s).
 #
 # La más reciente primero; repetí el atajo para ir ciclando/cerrando las anteriores.
 #

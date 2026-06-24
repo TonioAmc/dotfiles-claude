@@ -38,7 +38,7 @@ actions=( --action="default=Ir a la sesión" )
 
 # Extras opcionales según lo que calculó el hook:
 #  - tag synchronous → una notif nueva de la MISMA sesión reemplaza la anterior (no apila).
-#  - -t TIMEOUT → ms en pantalla; Fase 7 manda CN_TIMEOUT=0 = no expira (persistente).
+#  - -t TIMEOUT → ms en pantalla; Fase 7 manda CN_TIMEOUT=12000 (12s, luego al panel).
 extra=()
 [ -n "${CN_SESSION:-}" ] && extra+=( -h "string:x-canonical-private-synchronous:claude-${CN_SESSION}" )
 [ -n "${CN_TIMEOUT:-}" ] && extra+=( -t "${CN_TIMEOUT}" )
