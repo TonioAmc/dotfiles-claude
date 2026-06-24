@@ -120,7 +120,7 @@
   "effortLevel": "xhigh",
   "voice": {
     "enabled": true,
-    "mode": "hold"
+    "mode": "tap"
   },
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark",
