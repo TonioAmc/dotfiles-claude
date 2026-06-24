@@ -41,12 +41,20 @@ por eso el repo se puede mover sin romper nada) y crea los symlinks:
 - cada archivo de `scripts/hooks/` → `~/.local/bin/<nombre>` (uno por uno)
 
 **Scripts de hooks.** Los `settings.json` invocan hooks por nombre en `~/.local/bin/`
-(`hmail-hook.sh`, `claude-inhibit-{start,stop}.sh`, `claude-edit-snap.sh`,
-`disable-claude-mcps.py`). Esos scripts viven en `scripts/hooks/` y se symlinkean a
-`~/.local/bin/`, así una máquina nueva no queda con hooks que apuntan a archivos
-inexistentes. Son **compartidos** entre máquinas; cada `settings.json` decide cuáles
-activa (p. ej. `pici` usa un subconjunto). `claude-edit-snap.sh` tiene paths
-`/home/antolin/...` hardcodeados — portable solo entre máquinas con el mismo usuario.
+(`hmail-hook.sh`, `claude-edit-snap.sh`, `disable-claude-mcps.py`). Esos scripts
+viven en `scripts/hooks/` y se symlinkean a `~/.local/bin/`, así una máquina nueva
+no queda con hooks que apuntan a archivos inexistentes. Son **compartidos** entre
+máquinas; cada `settings.json` decide cuáles activa (p. ej. `pici` usa un
+subconjunto). `claude-edit-snap.sh` tiene paths `/home/antolin/...` hardcodeados —
+portable solo entre máquinas con el mismo usuario.
+
+**Inhibidor de tapa (mudado).** Los hooks del inhibidor de suspensión
+(`claude-inhibit-{start,stop,touch}.sh`, `claude-lid-watcher.sh` + su unit de
+systemd) ya **no** viven acá: se mudaron a su propio repo
+`~/proyectos/claude-lid-inhibitor`, que los symlinkea a `~/.local/bin/` con su
+propio `install.sh`. El **wiring** (las entradas de hook en
+`UserPromptSubmit`/`Stop`/`PreToolUse *`) **sigue acá**, en
+`machines/noti/settings.json`, porque Claude Code lee un solo `settings.json`.
 
 Cada host tiene su carpeta en `machines/` con un `settings.json` propio, así divergen
 sin pisarse: p. ej. `noti` (laptop) usa `opus[1m]` + effort `xhigh` + todos los hooks;

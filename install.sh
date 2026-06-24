@@ -41,15 +41,8 @@ for hook in "$REPO_DIR"/scripts/hooks/*; do
     chmod +x "$hook"
 done
 
-# Unit de systemd de usuario, si la máquina la define (p. ej. noti usa el
-# inhibidor de tapa; pici no). Tras enlazarla, recargar el daemon de usuario.
-if [ -f "$MACHINE_DIR/claude-lid-watcher.service" ]; then
-    link "$MACHINE_DIR/claude-lid-watcher.service" \
-         "$USER_HOME/.config/systemd/user/claude-lid-watcher.service"
-    systemctl --user daemon-reload 2>/dev/null \
-        && echo "  systemctl --user daemon-reload" \
-        || echo "  AVISO: no se pudo daemon-reload (¿bus de usuario disponible?)"
-    echo "  (el servicio NO arranca al boot; lo levanta claude-inhibit-start.sh)"
-fi
+# El inhibidor de tapa de Claude (hooks claude-inhibit-*, claude-lid-watcher +
+# su unit de systemd) se mudó a su propio repo: ~/proyectos/claude-lid-inhibitor.
+# En las máquinas que lo usen (noti), instalalo desde ahí con su propio install.sh.
 
 echo "Listo."
