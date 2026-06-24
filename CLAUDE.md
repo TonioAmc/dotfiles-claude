@@ -41,12 +41,22 @@ por eso el repo se puede mover sin romper nada) y crea los symlinks:
 - cada archivo de `scripts/hooks/` → `~/.local/bin/<nombre>` (uno por uno)
 
 **Scripts de hooks.** Los `settings.json` invocan hooks por nombre en `~/.local/bin/`
-(`hmail-hook.sh`, `claude-edit-snap.sh`, `disable-claude-mcps.py`). Esos scripts
-viven en `scripts/hooks/` y se symlinkean a `~/.local/bin/`, así una máquina nueva
-no queda con hooks que apuntan a archivos inexistentes. Son **compartidos** entre
-máquinas; cada `settings.json` decide cuáles activa (p. ej. `pici` usa un
-subconjunto). `claude-edit-snap.sh` tiene paths `/home/antolin/...` hardcodeados —
-portable solo entre máquinas con el mismo usuario.
+(`hmail-hook.sh`, `claude-edit-snap.sh`, `disable-claude-mcps.py`, `claude-notify.sh`).
+Esos scripts viven en `scripts/hooks/` y se symlinkean a `~/.local/bin/`, así una
+máquina nueva no queda con hooks que apuntan a archivos inexistentes. Son
+**compartidos** entre máquinas; cada `settings.json` decide cuáles activa (p. ej.
+`pici` usa un subconjunto). `claude-edit-snap.sh` tiene paths `/home/antolin/...`
+hardcodeados — portable solo entre máquinas con el mismo usuario. La carpeta guarda
+además *glue* de escritorio que **no** invoca `settings.json` directamente
+(`claude-notify-action.sh`, `claude-notify-jump.sh`): vive acá porque está acoplada
+a su hook y se symlinkea junto al resto.
+
+**Subsistema de notificaciones.** `claude-notify.sh` (hook `Notification` en `noti`)
++ `claude-notify-action.sh` + `claude-notify-jump.sh` arman las notificaciones de
+escritorio vía swaync cuando Claude espera respuesta o pide permiso. Resumen vivo en
+`notes/notificaciones.md`; detalle completo y gotchas en la memoria
+`reference_claude_notificaciones`. La config de swaync y los binds de Hyprland son
+locales (no versionados).
 
 **Inhibidor de tapa (mudado).** Los hooks del inhibidor de suspensión
 (`claude-inhibit-{start,stop,touch}.sh`, `claude-lid-watcher.sh` + su unit de
