@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# kitty-bg — lanza una ventana kitty DESACOPLADA en el MISMO workspace que la
+# terminal que ejecuta este script (típicamente la de Claude), SIN robar el foco.
+#
+# Uso:  kitty-bg <título> <directorio> <comando> [args...]
+# Ej:   kitty-bg "Sidebar" /ruta/wt claude "leé /tmp/arranque.md y ejecutá el plan"
+#
+# Motivo: `setsid -f kitty ...` abre la ventana en el workspace ACTIVO del
+# usuario (donde esté navegando en ese instante), no donde está la terminal que
+# la lanza → la ventana "aparece donde estás" y se pierde de vista. Hyprland
+# permite fijar el workspace destino con la regla `[workspace N silent]`
+# (silent = NO cambia el foco del usuario). Además, `hyprctl dispatch exec` hace
+# que el proceso cuelgue del compositor (Hyprland), no de la terminal lanzadora,
+# así que sobrevive al cierre de ésta (reemplaza el viejo `setsid -f`).
+set -euo pipefail
+
+if [ "$#" -lt 3 ]; then
+    echo "uso: kitty-bg <título> <directorio> <comando> [args...]" >&2
+    exit 2
+fi
+title="$1"; dir="$2"; shift 2
+
+# 1) Workspace de la ventana kitty lanzadora (por KITTY_PID, que kitty exporta).
+ws=""
+if [ -n "${KITTY_PID:-}" ]; then
+    ws=$(hyprctl clients -j 2>/dev/null | KITTY_PID="$KITTY_PID" python3 -c '
+import sys, json, os
+pid = int(os.environ.get("KITTY_PID", "0"))
+for c in json.load(sys.stdin):
+    if c.get("pid") == pid:
+        print(c["workspace"]["id"]); break
+' 2>/dev/null || true)
+fi
+# Fallback: workspace activo actual (mejor que nada si no se pudo resolver).
+if [ -z "$ws" ]; then
+    ws=$(hyprctl activeworkspace -j 2>/dev/null | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+fi
+
+# 2) Comando interno → script temporal. Evita el doble parsing (hyprctl pasa el
+#    string a `sh -c`, luego kitty parsea el `-e`): un comando con espacios o
+#    comillas (p.ej. el prompt de claude) se rompería. El script se auto-borra.
+cmd_file="$(mktemp "${TMPDIR:-/tmp}/kitty-bg-cmd.XXXXXX")"
+{
+    echo '#!/usr/bin/env bash'
+    printf '( sleep 5; rm -f -- %q ) >/dev/null 2>&1 &\n' "$cmd_file"
+    printf 'cd %q || exit 1\n' "$dir"
+    printf 'exec'
+    for a in "$@"; do printf ' %q' "$a"; done
+    printf '\n'
+} > "$cmd_file"
+chmod +x "$cmd_file"
+
+# 3) Forzar que la ventana nueva quede ABAJO de la actual (no al lado).
+#    En dwindle, `layoutmsg preselect d` fija la dirección de la PRÓXIMA ventana
+#    y tiene prioridad sobre force_split/aspect-ratio (con force_split=2 y una
+#    ventana más ancha que alta, sin esto la nueva caería a la DERECHA). El
+#    preselect aplica a la ventana activa, así que solo lo hacemos cuando el
+#    workspace de Claude ($ws) es el activo — el caso normal del handoff, con la
+#    terminal de Claude enfocada. Si el usuario está en otro workspace, se omite
+#    (no tendría sentido preseleccionar en el workspace equivocado).
+active_ws=$(hyprctl activeworkspace -j 2>/dev/null \
+    | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])' 2>/dev/null || true)
+if [ -n "$active_ws" ] && [ "$active_ws" = "$ws" ]; then
+    hyprctl dispatch layoutmsg preselect d >/dev/null 2>&1 || true
+fi
+
+# 4) Lanzar en ese workspace, silenciosa y desacoplada del compositor.
+#    title/dir van entre comillas simples (los respeta el `sh -c` de Hyprland);
+#    cmd_file no tiene espacios (lo genera mktemp).
+hyprctl dispatch exec "[workspace $ws silent] kitty --title '$title' --directory '$dir' -e '$cmd_file'" >/dev/null
+
+echo "kitty lanzada en workspace $ws · título: $title"

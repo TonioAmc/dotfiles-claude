@@ -34,6 +34,11 @@ fi
 link "$REPO_DIR/scripts/cc-statusline.sh" "$USER_HOME/.local/bin/cc-statusline.sh"
 chmod +x "$REPO_DIR/scripts/cc-statusline.sh"
 
+# kitty-bg: lanza una consola kitty desacoplada en el workspace de Claude (handoff
+# a sesión nueva), siempre ABAJO de la ventana de Claude (preselect dwindle).
+link "$REPO_DIR/scripts/kitty-bg" "$USER_HOME/.local/bin/kitty-bg"
+chmod +x "$REPO_DIR/scripts/kitty-bg"
+
 # Scripts de hooks (los settings.json los referencian por nombre en ~/.local/bin/)
 for hook in "$REPO_DIR"/scripts/hooks/*; do
     [ -e "$hook" ] || continue
