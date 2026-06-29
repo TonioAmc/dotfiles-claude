@@ -20,7 +20,6 @@
     ],
     "defaultMode": "bypassPermissions"
   },
-  "model": "opus[1m]",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -100,7 +99,9 @@
   "enabledPlugins": {
     "skill-creator@claude-plugins-official": false,
     "learning-mode@antolin-plugins": true,
-    "clangd-lsp@claude-plugins-official": true
+    "clangd-lsp@claude-plugins-official": true,
+    "superpowers@superpowers-dev": true,
+    "superpowers@claude-plugins-official": false
   },
   "extraKnownMarketplaces": {
     "claude-code-workflows": {
@@ -114,10 +115,17 @@
         "source": "github",
         "repo": "TonioAmc/claude-learning-mode"
       }
+    },
+    "superpowers-dev": {
+      "source": {
+        "source": "directory",
+        "path": "/home/antolin/proyectos/plugins/superpowers"
+      }
     }
   },
   "language": "espanol",
   "effortLevel": "xhigh",
+  "tui": "fullscreen",
   "voice": {
     "enabled": true,
     "mode": "hold"
